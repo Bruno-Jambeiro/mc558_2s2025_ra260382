@@ -5,11 +5,12 @@
 #include <vector>
 #include <algorithm>
 #include <climits>
-#include <functional>
-#include <queue>
 #include <iomanip>
 #include <cmath>
 #include <cassert>
+#ifdef BENCHMARK
+#include <chrono>
+#endif
 using namespace std;
 #define MAXVERTEX ((int)5e5 + 10)
 vector<pair<int,int>> grafo[MAXVERTEX]; //lista de adjacência, com pares (nó, custo) para as arestas
@@ -115,7 +116,21 @@ int main(){
         grafo[v].emplace_back(u, cost);
         grafo[u].emplace_back(v, cost); //Grafo bi direcional
     }
+#ifdef BENCHMARK
+    cerr << "Benchmark mode enabled\n";
+    auto start = chrono::high_resolution_clock::now();
+#endif
     dial_dijkstra(S, D, max_cost, N);
+#ifdef BENCHMARK
+    auto end = chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> ms = end - start;
+
+    std::cout.setf(std::ios::fixed);
+    std::cout.precision(6); // number of decimal places
+    cerr << "Time = "
+         << ms.count()
+         << " ms\n";
+#endif
 
     cout << setprecision(20) << distances[D];
 }
