@@ -2,6 +2,7 @@
 // Created by Bruno on 26/11/2025.
 //
 #include <iostream>
+#include <iostream>
 #include <vector>
 #include <algorithm>
 #include <climits>
@@ -13,9 +14,10 @@
 using namespace std;
 #define MAXVERTEX ((int)5e5 + 10)
 vector<pair<int,int>> grafo[MAXVERTEX]; //lista de adjacência, com pares (nó, custo) para as arestas
-int distances[MAXVERTEX];
+int Sdistances[MAXVERTEX];
+int Ddistances[MAXVERTEX];
 
-int INF = INT_MAX / 2;
+int INF = INT_MAX/2;
 
 struct dial_pq{
     int num_buckets;
@@ -77,28 +79,44 @@ private:
     }
 
 };
+int bidial_dijkstra(int s, int d, int max_edge, int N){
+    fill(Sdistances, Sdistances + MAXVERTEX, INF);
+    fill(Ddistances, Ddistances + MAXVERTEX, INF);
+    Sdistances[s] = 0;
+    Ddistances[d] = 0;
+    dial_pq Spq(max_edge, N);
+    dial_pq Dpq(max_edge, N);
+    Spq.emplace(0, s);
+    Dpq.emplace(0, d);
+    int best = INF;
+    while (!Spq.empty() && !Dpq.empty() && (Spq.top().first + Dpq.top().first < best)){
 
-void dial_dijkstra(int s, int d, int max_edge, int N){
-    fill(distances, distances + MAXVERTEX, INF);
-    distances[s] = 0;
-    //priority_queue<pair<int, int>, vector<pair<int, int>>, greater<>> pq;
-    dial_pq pq(max_edge, N);
-    pq.emplace((int)0, s);
-    while (!pq.empty()){
-        auto [dist, v] = pq.top(); pq.pop();
-        //if (distances[v] != pq.true_value) {cout << "first v: " << v << " distances[v]:  " << distances[v] << " true_value: " << pq.true_value << '\n';};
-        if (v == d) return;
-        for (auto [u, custo] : grafo[v]){
-            if (distances[u] > distances[v] + custo){
-                distances[u] = distances[v] + custo;
-//                if(distances[u] - pq.true_value > 500){
-//                    cout << "u: " << u << " v: " << v << " true_value: " << pq.true_value  << " head: " << pq.head << " custo: " << custo
-//                    << " distances[v]: " << distances[v] << '\n';
-//                }
-                pq.emplace(distances[u], u);
+        {
+            // avança a fronteira da Busca partindo de S
+            auto [dist, v] = Spq.top();
+            Spq.pop();
+            for (auto [u, custo]: grafo[v]) {
+                if (Sdistances[u] > Sdistances[v] + custo) {
+                    Sdistances[u] = Sdistances[v] + custo;
+                    best = min(best, Sdistances[u] + Ddistances[u]);
+                    Spq.emplace(Sdistances[u], u);
+                }
+            }
+        }
+
+        {
+            auto [dist, v] = Dpq.top();
+            Dpq.pop();
+            for (auto [u, custo]: grafo[v]) {
+                if (Ddistances[u] > Ddistances[v] + custo) {
+                    Ddistances[u] = Ddistances[v] + custo;
+                    best = min(best, Sdistances[u] + Ddistances[u]);
+                    Dpq.emplace(Ddistances[u], u);
+                }
             }
         }
     }
+    return best;
 }
 
 
@@ -115,7 +133,7 @@ int main(){
         grafo[v].emplace_back(u, cost);
         grafo[u].emplace_back(v, cost); //Grafo bi direcional
     }
-    dial_dijkstra(S, D, max_cost, N);
+    int best =  bidial_dijkstra(S, D, max_cost, N);
 
-    cout << setprecision(20) << distances[D];
+    cout << setprecision(20) << best;
 }
