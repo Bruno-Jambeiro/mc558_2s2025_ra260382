@@ -15,9 +15,12 @@ def detect_all_source_files():
     # Look for C++ files
     cpp_files = [f for f in os.listdir('.') if f.endswith('.cpp')]
     
-    # Look for Python files (excluding tester.py)
-    py_files = [f for f in os.listdir('.') if f.endswith('.py') and f != 'tester.py']
-    
+    # Look for Python files (excluding tester.py, case-insensitive)
+    py_files = [
+        f for f in os.listdir('.')
+        if f.endswith('.py') and os.path.basename(f).lower() != 'tester.py'
+    ]
+
     all_files = []
     for f in cpp_files:
         all_files.append((f, "cpp"))
@@ -39,7 +42,8 @@ def set_current_file(filename, filetype):
     if filetype == "cpp":
         EXEC = "./a.out"
     else:
-        EXEC = f"python3 {filename}"
+        # Use the running Python interpreter for portability on Windows
+        EXEC = f"{sys.executable} {filename}"
 
 
 def detect_source_file():
@@ -54,11 +58,14 @@ def detect_source_file():
         FILE_TYPE = "cpp"
         return
     
-    # Look for Python files
-    py_files = [f for f in os.listdir('.') if f.endswith('.py') and f != 'tester.py']
+    # Look for Python files (excluding tester.py, case-insensitive)
+    py_files = [
+        f for f in os.listdir('.')
+        if f.endswith('.py') and os.path.basename(f).lower() != 'tester.py'
+    ]
     if py_files:
         SOURCE_FILE = py_files[0]  # Use the first one found
-        EXEC = f"python3 {SOURCE_FILE}"
+        EXEC = f"{sys.executable} {SOURCE_FILE}"
         FILE_TYPE = "py"
         return
     
@@ -68,15 +75,11 @@ def detect_source_file():
 
 def compile_cpp(benchmark_enabled):
     print("Compilando...", end=" ")
-
-    cmd = ["g++", "-O2", "-std=c++17", SOURCE_FILE]
-
-    # adiciona flag -DBENCHMARK se habilitado
+    # use output file a.out explicitly
+    cmd = ["g++", "-O2", "-std=c++17", "-o", "a.out", SOURCE_FILE]
     if benchmark_enabled:
         cmd.append("-DBENCHMARK")
-
     r = subprocess.run(cmd, capture_output=True, text=True)
-
     if r.returncode != 0:
         print("ERRO")
         print(r.stderr)
@@ -95,119 +98,98 @@ def prepare_execution(benchmark_enabled):
         sys.exit(1)
 
 
-def run_test(input_path, expected_path):
-    # roda o programa
+def run_test(input_path, expected_path, benchmark_enabled):
     with open(input_path, "r") as f_in:
         if FILE_TYPE == "cpp":
-            result = subprocess.run(EXEC, stdin=f_in, capture_output=True, text=True)
+            result = subprocess.run("./a.out", stdin=f_in, capture_output=True, text=True)
         elif FILE_TYPE == "py":
-            result = subprocess.run(["python3", SOURCE_FILE], stdin=f_in, capture_output=True, text=True)
+            cmd = [sys.executable, SOURCE_FILE]
+            if benchmark_enabled:
+                cmd.append("--benchmark")
+            result = subprocess.run(cmd, stdin=f_in, capture_output=True, text=True)
         else:
             return ("ERROR", "Tipo de arquivo não suportado")
-
-    # Output stderr to stderr (will be captured by main function)
     if result.stderr.strip():
         print("=== STDERR ===", file=sys.stderr)
         print(result.stderr.strip(), file=sys.stderr)
         print("==============", file=sys.stderr)
-
     if result.returncode != 0:
         return ("RUNTIME ERROR", result.stderr)
-
-    # lê referência
     with open(expected_path, "r") as f_exp:
-        expected = f_exp.read().strip()
-
-    output = result.stdout.strip()
-
-    # tentativa: comparar doubles com margem de 1%
-    try:
-        out_vals = [float(x) for x in output.split()]
-        exp_vals = [float(x) for x in expected.split()]
-
-        if len(out_vals) != len(exp_vals):
-            return ("WA", f"Número de valores diferente.\nEsperado: {expected}\nObtido: {output}")
-
-        for o, e in zip(out_vals, exp_vals):
+        expected_raw = f_exp.read().strip()
+    output_raw = result.stdout.strip()
+    # Attempt numeric comparison extracting only float tokens
+    def extract_floats(text):
+        floats = []
+        for tok in text.split():
+            try:
+                floats.append(float(tok))
+            except ValueError:
+                continue
+        return floats
+    exp_nums = extract_floats(expected_raw)
+    out_nums = extract_floats(output_raw)
+    if exp_nums and out_nums:
+        if len(exp_nums) != len(out_nums):
+            return ("WA", f"Número de valores diferente.\nEsperado: {expected_raw}\nObtido: {output_raw}")
+        for o, e in zip(out_nums, exp_nums):
             erro = abs(o - e)
-            margem = 0.01 * abs(e)
-
+            margem = 0.01 * abs(e)  # 1% margin
             if erro > margem:
-                return ("WA",
-                        f"Valor fora da margem de erro de 1%.\n"
-                        f"Esperado: {e}\nObtido: {o}\n"
-                        f"Erro: {erro}\nMargem permitida: {margem}")
-
-        return ("OK", f"Esperado: {expected}\nObtido: {output}")
-
-    except ValueError:
-        # fallback: comparação literal
-        if output == expected:
-            return ("OK", f"Esperado: {expected}\nObtido: {output}")
-        else:
-            return ("WA", f"Esperado:\n{expected}\n\nObtido:\n{output}")
+                return ("WA", f"Valor fora da margem de erro de 1%.\nEsperado: {e}\nObtido: {o}\nErro: {erro}\nMargem permitida: {margem}")
+        return ("OK", f"Esperado: {exp_nums}\nObtido: {out_nums}")
+    # Fallback string compare when no numeric tokens
+    if output_raw == expected_raw:
+        return ("OK", f"Esperado: {expected_raw}\nObtido: {output_raw}")
+    else:
+        return ("WA", f"Esperado:\n{expected_raw}\n\nObtido:\n{output_raw}")
 
 
 def run_tests_for_file(source_file, file_type, benchmark_enabled, output_buffer):
-    """Run all tests for a specific source file and write results to buffer."""
+    if os.path.basename(source_file).lower() == 'tester.py':
+        return
     set_current_file(source_file, file_type)
-    
-    output_buffer.write(f"=== TESTING {source_file} ({file_type.upper()}) ===\n")
-    output_buffer.write(f"SOURCE_FILE = {SOURCE_FILE} ({FILE_TYPE.upper()})\n\n")
-    
-    # Prepare execution
+    ft_display = (FILE_TYPE or '').upper()
+    output_buffer.write(f"=== TESTING {source_file} ({ft_display}) ===\n")
+    output_buffer.write(f"SOURCE_FILE = {SOURCE_FILE} ({ft_display})\n\n")
     try:
         prepare_execution(benchmark_enabled)
         output_buffer.write("Preparação concluída com sucesso.\n\n")
     except SystemExit:
         output_buffer.write("ERRO na preparação do arquivo.\n\n")
         return
-    
-    # Get test files
     files = sorted(f for f in os.listdir(INPUT_DIR) if f.endswith(".in"))
     if not files:
         output_buffer.write("Nenhum arquivo .in encontrado.\n")
         return
-    
     output_buffer.write(f"Testando {len(files)} casos...\n\n")
-    
-    # Run tests
     for fname in files:
         in_path = os.path.join(INPUT_DIR, fname)
         out_path = os.path.join(OUTPUT_DIR, fname.replace(".in", ".out"))
-        
         if not os.path.exists(out_path):
             output_buffer.write(f"{fname}: ARQUIVO {out_path} NÃO ENCONTRADO\n")
             continue
-        
         output_buffer.write(f"--- Rodando {fname} ---\n")
-        
-        # Capture stderr separately for this test
         original_stderr = sys.stderr
         stderr_buffer = StringIO()
         sys.stderr = stderr_buffer
-        
         try:
-            status, msg = run_test(in_path, out_path)
+            status, msg = run_test(in_path, out_path, benchmark_enabled)
         finally:
             sys.stderr = original_stderr
             stderr_content = stderr_buffer.getvalue()
-        
         if status == "OK":
             output_buffer.write(f"{fname}: ✔ OK\n")
-            if msg:  # Show output even when OK
+            if msg:
                 output_buffer.write(f"{msg}\n")
         else:
             output_buffer.write(f"{fname}: ✘ {status}\n")
             output_buffer.write(f"{msg}\n")
             output_buffer.write("-" * 40 + "\n")
-        
-        # Add stderr content if present
         if stderr_content.strip():
             output_buffer.write("=== STDERR ===\n")
             output_buffer.write(stderr_content)
             output_buffer.write("==============\n")
-        
         output_buffer.write("\n")
 
 
@@ -219,33 +201,30 @@ def main():
         print(f"  - {filename} ({filetype.upper()})")
     print()
     
-    # Ask for benchmark mode (applies to all C++ files)
-    ans = input("Benchmark mode for C++ files? (y/n): ").strip().lower()
+    ans = input("Benchmark mode? (y/n): ").strip().lower()
     benchmark_enabled = (ans == "y")
     
-    # Test each file
     for source_file, file_type in all_source_files:
+        if os.path.basename(source_file).lower() == 'tester.py':
+            continue
+
         print(f"\n{'='*60}")
         print(f"TESTING {source_file} ({file_type.upper()})")
         print('='*60)
         
-        # Create output buffer
         output_buffer = StringIO()
         
-        # Run tests for this file
-        current_benchmark = benchmark_enabled if file_type == "cpp" else False
+        current_benchmark = benchmark_enabled  # agora aplica também para Python
         run_tests_for_file(source_file, file_type, current_benchmark, output_buffer)
         
-        # Write results to file
         output_filename = f"tests{os.path.splitext(source_file)[0]}.txt"
-        with open(output_filename, 'w') as f:
+        with open(output_filename, 'w', encoding='utf-8') as f:
             f.write(output_buffer.getvalue())
         
         print(f"Resultados salvos em: {output_filename}")
         
-        # Also print summary to console
-        results = output_buffer.getvalue()
         print("\nResumo dos testes:")
+        results = output_buffer.getvalue()
         for line in results.split('\n'):
             if ': ✔ OK' in line or ': ✘' in line:
                 print(f"  {line}")
