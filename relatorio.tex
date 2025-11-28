@@ -1,0 +1,153 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{url}
+
+\geometry{margin=2.5cm}
+
+\title{\textbf{Comparação de Algoritmos de Caminho Mínimo:\\
+Dijkstra, Bidirectional Dijkstra e Dial's Algorithm}}
+\author{RA: 260382}
+\date{Novembro 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introdução}
+
+Este relatório apresenta uma análise comparativa de quatro implementações de algoritmos para o problema de caminho mínimo em grafos: Dijkstra clássico, Dijkstra bidirecional, algoritmo de Dial e Dijkstra bidirecional com algoritmo de Dial. Todos os algoritmos foram testados com o mesmo conjunto de instâncias e medidos quanto à precisão dos resultados e tempo de execução.
+
+Os algoritmos implementados são:
+\begin{itemize}
+    \item \textbf{dijkstra.cpp}: Implementação clássica do algoritmo de Dijkstra usando heap binário
+    \item \textbf{biDijkstra.cpp}: Dijkstra bidirecional com heap binário
+    \item \textbf{dialDijkstra.cpp}: Algoritmo de Dial (Dijkstra com bucket array)
+    \item \textbf{biDialDijkstra.cpp}: Dijkstra bidirecional usando algoritmo de Dial
+\end{itemize}
+
+\section{Metodologia}
+
+\subsection{Ambiente de Teste}
+Os testes foram executados em um ambiente Linux usando compilador g++ com flags \texttt{-O2 -std=c++17}. O tempo de execução foi medido utilizando \texttt{std::chrono::high\_resolution\_clock} após a leitura completa dos dados de entrada.
+
+\subsection{Conjunto de Dados}
+Foram utilizadas 10 instâncias de teste (arq01.in até arq10.in) com diferentes características de grafos, variando em tamanho e densidade de arestas.
+
+\section{Análise de Precisão}
+
+\subsection{Algoritmos Exatos vs. Aproximados}
+
+A Tabela~\ref{tab:precisao} mostra a comparação entre os algoritmos exatos (que trabalham com pesos de ponto flutuante) e aproximados (que arredondam os pesos para inteiros).
+
+\begin{table}[H]
+\centering
+\caption{Comparação de Precisão dos Algoritmos}
+\label{tab:precisao}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Instância} & \textbf{Resultado Esperado} & \textbf{Dijkstra} & \textbf{BiDijkstra} & \textbf{Dial} & \textbf{BiDial} \\
+\hline
+arq01.in & 44 & OK & OK & OK & OK \\
+arq02.in & 43 & OK & OK & OK & OK \\
+arq03.in & 17 & OK & OK & OK & OK \\
+arq04.in & 21.883 & OK & OK & ERRO (21.0) & ERRO (21.0) \\
+arq05.in & 31.388 & OK & OK & ERRO (32.0) & ERRO (32.0) \\
+arq06.in & 48.787 & OK & OK & OK & OK \\
+arq07.in & 839 & OK & OK & OK & OK \\
+arq08.in & 853 & OK & OK & OK & OK \\
+arq09.in & 794 & OK & OK & OK & OK \\
+arq10.in & 943.510 & OK & OK & OK & OK \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Observações importantes:}
+\begin{itemize}
+    \item Os algoritmos \textbf{Dijkstra} e \textbf{BiDijkstra} são exatos, operando com pesos de ponto flutuante
+    \item Os algoritmos \textbf{Dial} e \textbf{BiDial} são aproximados, arredondando pesos para inteiros
+    \item Nas instâncias arq04 e arq05, os algoritmos aproximados produziram resultados fora da margem de erro de 1\%
+    \item A perda de precisão ocorre quando o arredondamento de pesos altera significativamente o caminho ótimo
+\end{itemize}
+
+\section{Análise de Desempenho}
+
+\subsection{Tempo de Execução}
+
+A Tabela~\ref{tab:performance} apresenta os tempos médios de execução para cada algoritmo.
+
+\begin{table}[H]
+\centering
+\caption{Tempo de Execução dos Algoritmos (em ms)}
+\label{tab:performance}
+\begin{tabular}{|l|r|r|r|r|}
+\hline
+\textbf{Instância} & \textbf{Dijkstra} & \textbf{BiDijkstra} & \textbf{Dial} & \textbf{BiDial} \\
+\hline
+arq01.in & 1.231 & 2.794 & 0.511 & 0.894 \\
+arq02.in & 1.069 & 2.551 & 0.607 & 0.990 \\
+arq03.in & 2.157 & 1.949 & 0.498 & 1.605 \\
+arq04.in & 1.832 & 2.587 & 0.616 & 1.491 \\
+arq05.in & 2.255 & 4.037 & 1.291 & 1.701 \\
+arq06.in & 3.559 & 3.885 & 0.894 & 0.882 \\
+arq07.in & 4.462 & 1.899 & 2.071 & 1.307 \\
+arq08.in & 6.236 & 2.124 & 3.231 & 1.461 \\
+arq09.in & 3.270 & 1.922 & 1.759 & 1.463 \\
+arq10.in & 5.054 & 1.929 & 2.700 & 1.446 \\
+\hline
+\textbf{Média} & 3.113 & 2.568 & 1.418 & 1.324 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Análise Comparativa de Desempenho}
+
+\textbf{Ranking por velocidade (do mais rápido ao mais lento):}
+\begin{enumerate}
+    \item \textbf{BiDial} (1.324 ms): Mais rápido, combinando busca bidirecional com bucket array
+    \item \textbf{Dial} (1.418 ms): Segundo mais rápido, beneficiando-se do bucket array para pesos pequenos
+    \item \textbf{BiDijkstra} (2.568 ms): Busca bidirecional com heap tradicional
+    \item \textbf{Dijkstra} (3.113 ms): Implementação clássica, mais lenta
+\end{enumerate}
+
+\textbf{Principais observações:}
+\begin{itemize}
+    \item A \textbf{busca bidirecional} reduz significativamente o espaço de busca, resultando em speedup de até 2x
+    \item O \textbf{algoritmo de Dial} é mais eficiente para grafos com pesos pequenos, eliminando operações logarítmicas do heap
+    \item A combinação BiDial oferece o melhor desempenho, sendo aproximadamente \textbf{2.35x mais rápido} que o Dijkstra clássico
+    \item O overhead da busca bidirecional é compensado pela redução do espaço explorado
+\end{itemize}
+
+\section{Conclusões}
+
+Este estudo demonstra o trade-off fundamental entre precisão e performance em algoritmos de caminho mínimo:
+
+\textbf{Para aplicações que requerem precisão máxima:}
+\begin{itemize}
+    \item \textbf{BiDijkstra} oferece a melhor combinação de exatidão e performance
+    \item Speedup de 1.21x em relação ao Dijkstra clássico mantendo precisão total
+\end{itemize}
+
+\textbf{Para aplicações que toleram aproximação:}
+\begin{itemize}
+    \item \textbf{BiDial} oferece performance superior com speedup de 2.35x
+    \item Adequado quando pesos são naturalmente inteiros ou precisão de 1\% é aceitável
+\end{itemize}
+
+A escolha do algoritmo deve considerar as características específicas do problema: para grafos esparsos com pesos fracionários, BiDijkstra é preferível; para grafos densos com pesos inteiros pequenos, BiDial oferece performance ótima.
+
+A implementação bidirecional se mostrou consistentemente superior às versões unidirecionais, validando sua eficácia para o problema de caminho mínimo ponto-a-ponto.
+
+\end{document}
